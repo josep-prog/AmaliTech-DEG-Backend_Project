@@ -1,45 +1,93 @@
-This project is a Pulse-Check API (Watchdog Sentinel), which I built to monitor remote devices and detect when they stop communicating. The idea behind it is: each device sends a signal called a heartbeat at regular intervals. I treat each heartbeat as proof that the device is still active. If a device stops sending these signals within a defined time, the system automatically raises an alert to indicate a possible failure.
+# Pulse-Check — Device Heartbeat Monitor
+
+A lightweight REST API that monitors remote devices by tracking heartbeat signals. If a device stops sending signals within its defined timeout window, the system automatically flags it as down.
+
+## Tech Stack
+
+- Python 3
+- Flask 3.0
+- APScheduler 3.10
+
+## Getting Started
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the server
+python app.py
+```
+
+The server starts on `http://localhost:5000` by default.
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/health` | Check if the server is running |
+| `POST` | `/monitors` | Register a new device monitor |
+| `POST` | `/monitors/{id}/heartbeat` | Send a heartbeat for a device |
+| `POST` | `/monitors/{id}/pause` | Pause monitoring for a device |
+| `DELETE` | `/monitors/{id}` | Remove a monitor |
+| `GET` | `/monitors` | List all monitors |
+| `GET` | `/monitors/{id}` | Get a specific monitor |
+| `GET` | `/monitors/{id}/heartbeat-history` | View heartbeat history for a device |
+
+### Register a monitor
+
+```json
+POST /monitors
+{
+  "id": "device-123",
+  "timeout": 30,
+  "alert_email": "admin@example.com"
+}
+```
+
+---
+
+## How It Works
+
+### User Story 1: Registering a Monitor
+
+Devices are registered via `POST /monitors` with a device ID, timeout (in seconds), and an alert email. The system validates the input, stores the monitor, and immediately starts a background timer. If no heartbeat arrives before the timer runs out, the device gets marked as down.
 
 <img width="800" height="600" alt="f1" src="https://github.com/user-attachments/assets/3fda6169-ba26-459b-8b77-bfefcc7820ce" />
 
+---
 
-### **User Story 1: Registering a Monitor**
+### User Story 2: Heartbeat (Timer Reset)
 
-I start by allowing a device to be registered for monitoring using *POST /monitors*. The request includes a device ID, a timeout, and an alert email. I validate this data to make sure nothing is missing and the timeout stays within safe limits. Once everything is correct, I store the device as a monitor and start a background timer. This timer defines how long the system should wait for a heartbeat before considering the device inactive. As soon as registration is complete, the device becomes active in the monitoring system.
+Devices send a heartbeat via `POST /monitors/{id}/heartbeat`. Each heartbeat resets the timer back to the full timeout and logs the timestamp. The response confirms the reset and shows how many seconds remain until the next expected heartbeat.
 
 <img width="800" height="600" alt="f2" src="https://github.com/user-attachments/assets/959d19b5-faa7-41b1-b817-cf889185b0eb" />
 
-### 
+---
 
-### **User Story 2: The Heartbeat (Reset)**
+### User Story 3: Alert on Failure
 
-Each device sends heartbeats using *POST /monitors/{id}/heartbeat*. When I receive a heartbeat, I first confirm that the device exists. If it does, I reset its timer back to the original timeout value, which starts a fresh monitoring window. I also record the exact time of each heartbeat so I can track device activity over time. After this process, I return a confirmation message showing that the reset was successful.
+If the timer expires without receiving a heartbeat, the device status changes to `"down"` and an alert is logged:
 
-<img width="800" height="600" alt="f3" src="https://github.com/user-attachments/assets/f97782d7-a8a6-48df-936c-144db9cf6471" />
+```json
+{ "ALERT": "Device device-123 is down!", "time": 1234567890.0 }
+```
 
+In a real deployment, this would connect to an email service or external monitoring dashboard.
 
-### **User Story 3: The Alert (Failure State)**
+<img width="800" height="600" alt="f3" src="https://github.com/user-attachments/assets/a8606100-5aa0-43ac-8bd2-9dc5618f458b" />
 
-If a device does not send a heartbeat before the timer reaches zero, I mark it as inactive. At that point, I trigger an internal alert function. I update the device status to “down” and generate an alert message in this format:
+---
 
-{"ALERT": "Device device-123 is down\!", "time": ...}
+### Bonus: Pause / Snooze
 
-This alert is meant for system operators so they can react quickly. In a real deployment, it can be forwarded to email services or monitoring dashboards.
+`POST /monitors/{id}/pause` puts a device in maintenance mode — the timer stops and no alerts fire. When a heartbeat comes in after a pause, the device automatically resumes active monitoring and the timer restarts.
 
 <img width="800" height="600" alt="f4" src="https://github.com/user-attachments/assets/a8606100-5aa0-43ac-8bd2-9dc5618f458b" />
 
+---
 
-### **Bonus User Story: Pause (Snooze Feature)**
+### Extra Feature: Heartbeat History
 
-I added a maintenance mode using *POST /monitors/{id}/pause*. When this endpoint is called, I stop monitoring that device. The timer is cancelled and the device status becomes “paused”. While in this state, the system ignores time passing and does not generate any alerts. If a heartbeat comes in after pausing, I automatically bring the device back to active monitoring. I restart the timer from the full timeout value and continue normal tracking.
+Every heartbeat timestamp is stored per device, capped at the 50 most recent entries. This makes it easier to see how often a device has been communicating and spot any gaps in activity.
 
-<img width="800" height="600" alt="f5" src="https://github.com/user-attachments/assets/60e2da12-ab3c-4390-9122-cea5650f0cce" />
-
-
-### **Developer’s Choice Feature: Heartbeat History Tracking**
-
-I also track every heartbeat received from each device. Each timestamp is stored in a history list linked to that device. To keep the system efficient, I limit this history to the most recent 50 entries. This helps me understand how each device behaves over time and makes it easier to detect unusual communication patterns during monitoring analysis.
-
-<img width="800" height="600" alt="f6" src="https://github.com/user-attachments/assets/cb0a4d91-44c2-4944-90f4-5928f29ee6ea" />
-
-
+<img width="800" height="600" alt="f5" src="https://github.com/user-attachments/assets/cb0a4d91-44c2-4944-90f4-5928f29ee6ea" />
