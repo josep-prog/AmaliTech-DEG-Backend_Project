@@ -1,4 +1,4 @@
-# Pulse-Check — Device Heartbeat Monitor
+# Pulse-Check Device Heartbeat Monitor
 
 A lightweight REST API that monitors remote devices by tracking heartbeat signals. If a device stops sending signals within its defined timeout window, the system automatically flags it as down.
 
