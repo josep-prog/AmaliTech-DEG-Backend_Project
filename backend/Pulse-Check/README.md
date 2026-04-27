@@ -40,7 +40,7 @@ POST /monitors
 {
   "id": "device-123",
   "timeout": 30,
-  "alert_email": "email@example.com" #j.nishimwe@alustudent.com
+  "alert_email": "email@example.com"
 }
 ```
 
