@@ -4,7 +4,8 @@
 
 ### control layer that guarantees each payment is executed exactly once, even under retries or heavy traffic
 
-\<img width="800" height="600" alt="figure1" src="https://github.com/user-attachments/assets/e2ecf69f-a0b5-48b9-af3b-ce3978f58819" /\>
+<img width="800" height="600" alt="figure1" src="https://github.com/user-attachments/assets/14b5a672-1f34-4ccd-babd-979e786e3e53" />
+
 
 ### **User Story 1  First Transaction (Happy Path)**
 
@@ -14,7 +15,8 @@ If the key is there, I treat it as a new transaction. I take the payment details
 
 After that, I simulate real payment processing by adding a small 2-second delay. Once that finishes, I return a response like “Charged 100 GHS” and store that response in memory. This is basically the first clean flow  one request goes in, gets processed, and the result is saved for future use if needed.
 
-\<img width="800" height="600" alt="figure2" src="https://github.com/user-attachments/assets/152f071e-5b28-41f4-9b10-cc9ab2eab516" /\>
+<img width="800" height="600" alt="figure2" src="https://github.com/user-attachments/assets/3d471a0f-d43b-4af5-8ae2-1d946aa5db68" />
+
 
 ### **User Story 2  Duplicate Attempt (Idempotency Logic)**
 
@@ -24,7 +26,8 @@ When that happens, the system first checks if it has already seen that key befor
 
 So there is no delay, no re-running of payment, nothing happens twice. I also return a header called *X-Cache-Hit: true* so the client can clearly see that this response was reused and not newly processed. This is basically what makes the system safe against duplicate charges.
 
-\<img width="800" height="600" alt="figure3" src="https://github.com/user-attachments/assets/e97975b1-18e6-436b-bc58-18614b7618dd" /\>
+<img width="800" height="600" alt="figure3" src="https://github.com/user-attachments/assets/1e1a120f-c2bb-43bb-bf61-3a58347a71aa" />
+
 
 ### **User Story 3  Same Key with Different Data (Safety Check)**
 
@@ -34,7 +37,8 @@ So what I do is compare the new request with the original one using the hash I s
 
 This helps prevent mistakes and also protects the system from someone trying to reuse a key for a different transaction. It keeps the data clean and consistent.
 
-\<img width="800" height="600" alt="figure4" src="https://github.com/user-attachments/assets/c9f91d77-c255-47c7-b8de-2b4b8f983c3e" /\>
+<img width="800" height="600" alt="figure4" src="https://github.com/user-attachments/assets/61b387c8-25bc-43bf-82a8-5cf23990f137" />
+
 
 ### **Bonus User Story  In-Flight Check (Race Condition Handling)**
 
@@ -44,7 +48,10 @@ Instead of letting both run or rejecting the second one, I made the second reque
 
 So when Request B comes in, it sees that the same key is already being processed, and instead of doing anything new, it just waits. Once Request A finishes, it triggers the signal, and Request B simply returns the same result. This way, even if requests hit the system at the exact same time, only one payment is actually processed.
 
-\<img width="800" height="600" alt="figure5" src="https://github.com/user-attachments/assets/6f43c4ba-095f-4182-8515-0d03194b8a89" /\>
+<img width="800" height="600" alt="figure5" src="https://github.com/user-attachments/assets/13e4d336-9dd3-4750-b6be-d07053ce0d7a" />
+
+
+
 
 ### **Developer’s Choice  TTL Cleanup (System Health Feature)**
 
@@ -52,7 +59,7 @@ The extra thing I added is a simple cleanup system using TTL (Time-To-Live). Bas
 
 So I set it so that every key expires after 24 hours. Whenever a new request comes in, the system also checks and removes old entries automatically.This keeps the system light and clean over time, and also makes sure old transactions don’t interfere with new ones.
 
-\<img width="800" height="600" alt="figure6" src="https://github.com/user-attachments/assets/caa48723-e4ce-417f-a5d5-251e690b25f5" /\>
+<img width="800" height="600" alt="figure6" src="https://github.com/user-attachments/assets/be1724be-09ce-4d3c-8f36-bfc89fa563ec" />
 
 **INSTALL DEPENDENCES AND RUN THE PROJECT**
 
@@ -97,6 +104,8 @@ Below are the different scenarios you might encounter when using this endpoint:
 }
 
 When a request is sent for the first time with a new idempotency key, the payment is processed successfully.
+<img width="1919" height="1079" alt="201" src="https://github.com/user-attachments/assets/9320d77c-8ff7-4e18-80fc-e1db4bd5653b" />
+
 
 ### **2\. Duplicate Request (Same Key \+ Same Body)**
 
@@ -112,6 +121,9 @@ When a request is sent for the first time with a new idempotency key, the paymen
 }
 
 If the same request is sent again with the same idempotency key and identical data, the system does not process it again. Instead, it returns the original response.
+
+<img width="1919" height="1079" alt="201" src="https://github.com/user-attachments/assets/509c35bb-b08e-40d6-8bc7-be7cf0fbb364" />
+
 
 ### **3\. In-Flight Duplicate Request**
 
@@ -133,6 +145,8 @@ If a duplicate request arrives while the first one is still being processed, the
 
 An idempotency key can only be used with one specific request. If you reuse it with different data, the request is rejected.
 
+<img width="1919" height="1079" alt="morethan_one" src="https://github.com/user-attachments/assets/633565b8-0301-4d51-91fb-523a5ef1ee79" />
+
 ### **5\. Missing Idempotency Key**
 
 * **Status:** 400 Bad Request  
@@ -145,6 +159,9 @@ An idempotency key can only be used with one specific request. If you reuse it w
 }
 
 If the idempotency key is not provided, the request will not be processed.
+
+<img width="1919" height="1079" alt="400" src="https://github.com/user-attachments/assets/7959a5e3-8a9b-4c28-b24b-10dfb3f364ee" />
+
 
 ### **6\. Invalid Currency**
 
@@ -173,6 +190,9 @@ If the idempotency key is not provided, the request will not be processed.
 
 The API only accepts specific currencies. Any unsupported currency will result in a validation error.
 
+<img width="1919" height="1079" alt="422_invalid_currency" src="https://github.com/user-attachments/assets/9f4809c8-7bdd-48ca-8487-2b84e3a74695" />
+
+
 ### **7\. Invalid Amount (≤ 0\)**
 
 * **Status:** 422 Unprocessable Entity  
@@ -199,4 +219,6 @@ The API only accepts specific currencies. Any unsupported currency will result i
 }
 
 The payment amount must be greater than zero. Zero or negative values are rejected.
+<img width="1919" height="1079" alt="422" src="https://github.com/user-attachments/assets/c3ecbcd6-d9fc-4e0e-b8c8-a0f16a4e0656" />
+
 
