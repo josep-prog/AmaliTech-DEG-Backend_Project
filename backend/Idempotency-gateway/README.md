@@ -1,6 +1,8 @@
 ## **Challenge1 : Idempotency-Gateway**
 
-### Idempotency, in simple terms, means that repeating the same action multiple times still produces the same result as doing it once, and I applied this idea to solve the real problem of double charging in payment systems, which often happens when a request times out and gets retried. To fix this, I built an Idempotency Gateway using FastAPI in Python that ensures every payment request is treated as a single unique transaction by using an Idempotency-Key as a fingerprint for each request. When a request comes in, the system checks the key: if it’s new, it processes and stores the result; if it’s repeated with the same data, it simply returns the stored response instead of reprocessing; and if the same key is used with different data, it rejects it to prevent errors or misuse. I also added hashing of key fields like amount and currency to better identify identical transactions, plus locking and threading to safely handle simultaneous duplicate requests so only one is processed while others wait for the same result. Finally, I included a TTL mechanism that automatically clears old keys after 24 hours to keep the system efficient, making the whole gateway act as a reliable control layer that guarantees each payment is executed exactly once, even under retries or heavy traffic
+### Idempotency, in simple terms, means that repeating the same action multiple times still produces the same result as doing it once, and I applied this idea to solve the real problem of double charging in payment systems, which often happens when a request times out and gets retried. To fix this, I built an Idempotency Gateway using FastAPI in Python that ensures every payment request is treated as a single unique transaction by using an Idempotency-Key as a fingerprint for each request. When a request comes in, the system checks the key: if it’s new, it processes and stores the result; if it’s repeated with the same data, it simply returns the stored response instead of reprocessing; and if the same key is used with different data, it rejects it to prevent errors or misuse. I also added hashing of key fields like amount and currency to better identify identical transactions, plus locking and threading to safely handle simultaneous duplicate requests so only one is processed while others wait for the same result. Finally, I included a TTL mechanism that automatically clears old keys after 24 hours to keep the system efficient, making the whole gateway act as a reliable 
+
+### control layer that guarantees each payment is executed exactly once, even under retries or heavy traffic
 
 ### **User Story 1  First Transaction (Happy Path)**
 
@@ -54,8 +56,7 @@ So I set it so that every key expires after 24 hours. Whenever a new request com
 
 3. **Access the application**  
 * API endpoint: [http://localhost:8000](http://localhost:8000)   
-* Interactive documentation: [http://localhost:8000/docs](http://localhost:8000/docs) (FastAPI Swagger UI)  
-* Alternative documentation: [http://localhost:8000/redoc](http://localhost:8000/redoc) 
+* Interactive documentation: [http://localhost:8000/docs](http://localhost:8000/docs)  (FastAPI Swagger UI)
 
 **API Reference**
 
@@ -63,13 +64,13 @@ So I set it so that every key expires after 24 hours. Whenever a new request com
 
 **Required header**: Idempotency-Key: \<any unique string\>
 
-| Scenario | Status | Body | Extra header |
+| Scenario | Status | Body | Image |
 | :---- | :---- | :---- | :---- |
-| First request | **201**  | {"status":"success","message":"Charged 100.0 GHS"} |  |
-| Duplicate (same key \+ same body) | **201** | {"status":"success","message":"Charged 100.0 GHS"} | X-Cache-Hit: true |
-| In-flight duplicate | **201** | same as above (after wait) | X-Cache-Hit: true |
-| Same key, different body | **422** | {"detail":"Idempotency key already used for a different request body."} |  |
-| Missing key | **400** | {"detail":"Idempotency-Key header is required."} |  |
-| Invalid currency | **422** | Validation error details |  |
-| Amount \<= 0 | **422** | Validation error details |  |
+| First request | **201**  | {"status":"success","message":"Charged 1000.0 GHS"} |  |
+| Duplicate (same key \+ same body) | **201** | {"status":"success","message":"Charged 1000.0 GHS"} |  |
+| In-flight duplicate | **201** | same as above (after wait) |  |
+| Same key, different body | **422** | {"detail":"This key was already used with a different request body."} |  |
+| Missing key | **400** | {"detail":"Idempotency-Key header is required."}  |  |
+| Invalid currency | **422** | {"detail":\[{"type":"value\_error","loc":\["body","currency"\],"msg":"Value error, Currency must be one of: GHS, RWF","input":"USD","ctx":{"error":{}}}\]} |  |
+| Amount \<= 0 | **422** | {"detail":\[{"type":"greater\_than","loc":\["body","amount"\],"msg":"Input should be greater than 0","input":0,"ctx":{"gt":0.0}}\]} |  |
 
