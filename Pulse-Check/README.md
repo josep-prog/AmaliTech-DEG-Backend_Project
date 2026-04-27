@@ -1,4 +1,4 @@
-# Pulse-Check — Device Heartbeat Monitor
+# Pulse-Check Device Heartbeat Monitor
 
 A lightweight REST API that monitors remote devices by tracking heartbeat signals. If a device stops sending signals within its defined timeout window, the system automatically flags it as down.
 
@@ -33,6 +33,24 @@ The server starts on `http://localhost:5000` by default.
 | `GET` | `/monitors/{id}` | Get a specific monitor |
 | `GET` | `/monitors/{id}/heartbeat-history` | View heartbeat history for a device |
 
+To run all this it's better to have **postman** to keep it easer
+
+GET /health :
+<img width="1917" height="1075" alt="200_ok" src="https://github.com/user-attachments/assets/d23cf9fd-ae5e-4204-95f2-84c9e020e695" />
+
+REGISTER and GET : 
+<img width="1919" height="1079" alt="registered" src="https://github.com/user-attachments/assets/181e0052-9839-4979-8ad5-45cbbf218197" />
+
+GET with ID specified : 
+<img width="964" height="1049" alt="GET-idspecified" src="https://github.com/user-attachments/assets/e28b7135-a46a-4e0e-890a-8ffb2748072d" />
+
+DELETE : 
+<img width="727" height="1030" alt="delete" src="https://github.com/user-attachments/assets/702abad3-6af3-4443-9a74-fc183f85efcf" />
+
+
+
+
+
 ### Register a monitor
 
 ```json
@@ -40,7 +58,7 @@ POST /monitors
 {
   "id": "device-123",
   "timeout": 30,
-  "alert_email": "admin@example.com"
+  "alert_email": "email@example.com"
 }
 ```
 
