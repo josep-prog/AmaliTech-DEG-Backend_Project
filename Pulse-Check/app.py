@@ -7,15 +7,13 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from flask import Flask, jsonify, request
 
 app = Flask(__name__)
-scheduler = BackgroundScheduler()
-scheduler.start()
-atexit.register(lambda: scheduler.shutdown(wait=False))
 
 monitors = {}
 lock = Lock()
 
-MAX_HEARTBEAT_HISTORY = 50
-MAX_TIMEOUT = 86400  # 24 hours
+scheduler = BackgroundScheduler()
+scheduler.start()
+atexit.register(lambda: scheduler.shutdown(wait=False))
 
 
 def is_valid_email(email):
@@ -26,18 +24,19 @@ def is_valid_email(email):
 def fire_alert(device_id):
     with lock:
         mon = monitors.get(device_id)
-        if not mon or mon["status"] != "active":
+        if mon is None or mon["status"] != "active":
             return
         mon["status"] = "down"
         mon["alert_count"] += 1
-    print(json.dumps({"ALERT": f"Device {device_id} is down!", "time": datetime.now(timezone.utc).isoformat()}), flush=True)
+    # log to stdout for now
+    print(f"ALERT: device {device_id} is down at {datetime.utcnow().isoformat()}", flush=True)
 
 
 def schedule_alert(device_id, timeout):
     run_date = datetime.now(timezone.utc) + timedelta(seconds=timeout)
     scheduler.add_job(
         fire_alert,
-        trigger="date",
+        "date",
         run_date=run_date,
         id=f"monitor_{device_id}",
         args=[device_id],
@@ -49,7 +48,7 @@ def schedule_alert(device_id, timeout):
 def cancel_alert(device_id):
     try:
         scheduler.remove_job(f"monitor_{device_id}")
-    except Exception:
+    except:
         pass
 
 
@@ -60,19 +59,19 @@ def health_check():
 
 @app.post("/monitors")
 def create_monitor():
-    data = request.get_json(silent=True)
-    if not data:
-        return jsonify({"error": "expected JSON body"}), 400
+    data = request.get_json()
+    if data is None:
+        return jsonify({"error": "request body must be JSON"}), 400
 
     device_id = data.get("id")
     timeout = data.get("timeout")
     alert_email = data.get("alert_email")
 
     if not device_id or timeout is None or not alert_email:
-        return jsonify({"error": "id, timeout, and alert_email are all required"}), 400
+        return jsonify({"error": "id, timeout, and alert_email are required"}), 400
 
     if not is_valid_email(str(alert_email)):
-        return jsonify({"error": "alert_email must be a valid email address"}), 400
+        return jsonify({"error": "alert_email is not a valid email"}), 400
 
     try:
         timeout = int(timeout)
@@ -81,12 +80,12 @@ def create_monitor():
     except (ValueError, TypeError):
         return jsonify({"error": "timeout must be a positive integer"}), 400
 
-    if timeout > MAX_TIMEOUT:
-        return jsonify({"error": f"timeout cannot exceed {MAX_TIMEOUT} seconds (24 hours)"}), 400
+    if timeout > 86400:  # 24 hours max
+        return jsonify({"error": "timeout cannot exceed 86400 seconds"}), 400
 
     with lock:
         if device_id in monitors:
-            return jsonify({"error": f"monitor '{device_id}' already exists; delete it first"}), 409
+            return jsonify({"error": f"a monitor with id '{device_id}' already exists"}), 409
 
         run_date = schedule_alert(device_id, timeout)
         monitors[device_id] = {
@@ -108,7 +107,7 @@ def create_monitor():
 def heartbeat(device_id):
     with lock:
         mon = monitors.get(device_id)
-        if not mon:
+        if mon is None:
             return jsonify({"error": f"no monitor found for '{device_id}'"}), 404
 
         if mon["status"] == "down":
@@ -118,7 +117,8 @@ def heartbeat(device_id):
         now = datetime.now(timezone.utc).isoformat()
 
         mon["heartbeat_history"].append(now)
-        mon["heartbeat_history"] = mon["heartbeat_history"][-MAX_HEARTBEAT_HISTORY:]
+        if len(mon["heartbeat_history"]) > 50:
+            mon["heartbeat_history"] = mon["heartbeat_history"][-50:]
         mon["last_heartbeat_at"] = now
         mon["status"] = "active"
 
@@ -127,7 +127,7 @@ def heartbeat(device_id):
 
     msg = f"heartbeat ok, timer reset to {mon['timeout']}s"
     if was_paused:
-        msg = f"monitor auto-unpaused; {msg}"
+        msg = "monitor auto-unpaused; " + msg
     return jsonify({"message": msg})
 
 
@@ -135,7 +135,7 @@ def heartbeat(device_id):
 def pause_monitor(device_id):
     with lock:
         mon = monitors.get(device_id)
-        if not mon:
+        if mon == None:
             return jsonify({"error": f"no monitor found for '{device_id}'"}), 404
         if mon["status"] == "down":
             return jsonify({"error": f"monitor '{device_id}' is already down; cannot pause"}), 409
@@ -153,7 +153,7 @@ def pause_monitor(device_id):
 def delete_monitor(device_id):
     with lock:
         mon = monitors.pop(device_id, None)
-        if not mon:
+        if mon == None:
             return jsonify({"error": f"no monitor found for '{device_id}'"}), 404
         cancel_alert(device_id)
 
@@ -166,7 +166,11 @@ def list_monitors():
     with lock:
         result = list(monitors.values())
     if status_filter:
-        result = [m for m in result if m["status"] == status_filter]
+        filtered = []
+        for m in result:
+            if m["status"] == status_filter:
+                filtered.append(m)
+        return jsonify(filtered)
     return jsonify(result)
 
 
@@ -174,7 +178,7 @@ def list_monitors():
 def get_monitor(device_id):
     with lock:
         mon = monitors.get(device_id)
-        if not mon:
+        if mon is None:
             return jsonify({"error": f"no monitor found for '{device_id}'"}), 404
         return jsonify(mon)
 
@@ -183,7 +187,7 @@ def get_monitor(device_id):
 def heartbeat_history(device_id):
     with lock:
         mon = monitors.get(device_id)
-        if not mon:
+        if mon == None:
             return jsonify({"error": f"no monitor found for '{device_id}'"}), 404
         return jsonify({"device_id": device_id, "heartbeat_history": mon["heartbeat_history"]})
 
